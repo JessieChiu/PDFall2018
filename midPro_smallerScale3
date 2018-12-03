@@ -1,0 +1,419 @@
+/*
+物件：
+    RISK：風險點
+        int x：風險點x座標
+        int y：風險點y座標
+        double R：風險點半徑R
+        double P：風險數值P
+                        
+    POINT：每個節點，總共n*n個
+        int x：節點x座標
+        int y：節點y座標
+        double riskFromStart：目前從起點到此點的風險總和最小值
+        double totalRisk：目前從起點到此點的風險總和最小值（riskFromStart）+此點直線到終點的風險
+        double leftLength：從此點到下個計算風險的位置的距離（1 + int(d) - d）
+        double d：從起點到此點的距離
+        POINT* parent：前一節點的pointer
+                    
+函數：
+    void myAlgorithm(RISK* riskPoint, int m, int n, POINT* start, POINT* end, double dBar, int w, double** risks)：演算法本體
+        給
+        riskPoint：風險點
+        m：風險點個數
+        n：網格長
+        start：計算路徑起點
+        end：計算路徑終點
+        dBar：最長距離
+        w：轉折懲罰
+        risks：每個大格的風險值
+        計算從start到end最小的風險值
+                      
+    double calRisk(RISK* riskPoint, int m, POINT* start, POINT* endㄏ)：計算風險
+        給
+        riskPoint：風險點
+        m：風險點個數
+        start：路段起點
+        end：路段終點
+        step：每隔距離多遠就計算一次風險（題目原先給定1）
+        從start到end，在start.leftLength處第一次計算風險，之後每隔step就計算一次風險
+                      
+    inline double calDist(double startX, double startY, double endX, double endY)：計算距離
+        給startX, startY, endX, endY，計算start和end的距離
+                    
+比較函數：
+    class minHeap（return a->totalRisk > b->totalRisk;）
+        輸入兩節點，前節點的totalRisk大時輸出為true
+        讓open每次輸出時為totalRisk最小值
+            
+pseudocode：==========本code概念類似於A star，每次以風險（totalRisk）最小值的點開始往所有節點==========
+    open.clear() //開啟過，為候選點的節點，open每次pop為totalR最小值，稱為min heap
+    close.clear() //已經確定距離最小的節點
+    Parent(start) = start //start的parent設為start自己
+    open.append(start) //start加入候選點
+    while (open.size() != 0) //如果還有候選點
+    {
+        s = open.pop() //s是目前總風險值totalRisk最小值
+        close.append(s) //s是目前總風險值totalRisk最小值
+        if (s == end)
+            return FOUND!!!!! //總風險最小值的點為終點
+        for s‘ 為所有點：
+        {
+            if (s‘ not in close) //如果s‘不是已經找到最小風險的點，就要繼續找有沒有更小的風險
+            {
+                //看看經過s到s‘風險有沒有比較小
+                if ( L(s) + L(s, s‘) + L(s, end) < dBar) 
+                {
+                    if ( R(s) + R(s, s‘) + w < R(s‘)) //如果風險有比較小就把s‘的parent設為start
+                    {
+                        Parent(s‘) = start
+                        R(s‘) = R(s) + R(s, s‘) + w
+                    }
+                }
+                totalR(s‘) = R(s‘) + R(s‘, end) + w //將s‘的總風險設為s‘.riskFromStart + 風險(s‘ 至 end) + w
+                if (s‘ in open)
+                    open.erase(s)
+                open.append(s‘) //將open從新加入open候選點
+            }
+        }
+    }
+    return NOT FOUND!!!! //跑過所有候選點都沒有到終點
+    
+巧思：
+    1. 
+*/
+                    
+#include<iostream>
+#include<vector>
+#include<string>
+#include<cmath>
+#include<ctime>
+#include<algorithm>
+#include<stdexcept>
+#include<unordered_map>
+#define riskStep 5.0
+#define myNStep 1;
+using namespace std;
+                    
+                    
+//============Risk Point============
+class RISK
+{
+public:
+    RISK(void);
+    void set(int data, char datatype);
+    int x;
+    int y;
+    double R;
+    double P;
+};
+                      
+//============POINT With XY============
+class POINT
+{
+public:
+    POINT(int _x, int _y);
+    POINT(void);
+    POINT* parent;
+    double riskFromStart;
+    double totalRisk;
+    double leftLength;
+    double d;
+    int x;
+    int y;
+};
+                      
+//============My Algorithm============
+void myAlgorithm(RISK* riskPoint, int m, int n, POINT* start, POINT* end, double dBar, int w, double** risks);
+                      
+//============Given LeftLength, Cal Risk Between Two Point============
+double calRisk(RISK* riskPoint, int m, POINT* start, POINT* end, double** risks);
+                      
+//============Cal Distance Between Two Point============
+inline double calDist(double startX, double startY, double endX, double endY);
+                      
+//============make_heap compare function============
+class minHeap {
+public:
+    inline bool operator()(const POINT* a, const POINT* b)
+    {
+        return a->totalRisk > b->totalRisk;
+    }
+};
+                      
+//============MAIN FUNCTION============
+int main()
+{
+    int n = 0, m = 0, w = 0;
+    double dBar = 0;
+    double temp;
+    cin >> n >> m >> w >> dBar;
+
+    int nStep = myNStep;
+
+    n = n / nStep;
+    dBar = dBar / nStep;
+    n += 1;
+                      
+    //============Read Risk Point============
+    RISK* riskPoint = new RISK[m];
+    char datatype[4] = { 'x', 'y', 'R', 'P' };
+    for (char *line = datatype; line != datatype + 4; line++)
+    {
+        for (int i = 0; i < m; i++)
+        {
+            cin >> temp;
+            if(*line != 'P')
+                temp = temp / nStep;
+            riskPoint[i].set(temp, *line);
+        }
+    }
+  
+    int risksSize = riskStep * n;
+    double** risks = new double*[risksSize];
+    for(int i = 0; i < risksSize ; i ++)
+    {
+        risks[i] = new double[risksSize];
+        {
+            for(int j = 0; j < risksSize ; j ++)
+                risks[i][j] = -1;
+        }
+    }
+    //============Read Start & End XY============
+    POINT* start = new POINT;
+    POINT* end = new POINT;
+    cin >> start->x >> start->y >> end->x >> end->y;
+    start->x = start->x / nStep;
+    start->y = start->y / nStep;
+    end->x = end->x / nStep;
+    end->y = end->y / nStep;
+
+    start->riskFromStart = 0;
+    start->totalRisk = 0;
+                                   
+    //============My Algorithm============
+    myAlgorithm(riskPoint, m, n, start, end, dBar, w, risks);        
+      
+  
+    vector<POINT*> ans;
+    end = end->parent;
+  
+    while (end->parent != end)
+    {
+        ans.push_back(end);
+        end = end->parent;
+    }
+    reverse(ans.begin(), ans.end());
+      
+    cout << ans.size() << " ";
+    for (vector<POINT*>::iterator ansIter = ans.begin(); ansIter != ans.end(); ansIter++)
+    {
+        if (ansIter != ans.end() - 1)
+        {
+            cout << (*ansIter)->x * nStep << " " << (*ansIter)->y * nStep << " ";
+        }
+        else
+            cout << (*ansIter)->x * nStep << " " << (*ansIter)->y * nStep;
+    }
+                      
+    delete[] riskPoint;
+    delete start;
+    return 0;
+}
+                      
+//============Risk Point============
+RISK::RISK(void)
+{
+    x = 0;
+    y = 0;
+    R = 0;
+    P = 0;
+}
+                      
+void RISK::set(int data, char datatype)
+{
+    switch (datatype)
+    {
+    case 'x'://設定x
+        x = data;
+        break;
+    case 'y'://設定y
+        y = data;
+        break;
+    case 'R'://設定R
+        R = data;
+        break;
+    case 'P'://設定P
+        P = data;
+        break;
+    }
+}
+                      
+//============POINT With XY============
+POINT::POINT(int _x, int _y)
+{
+    x = _x;
+    y = _y;
+    riskFromStart = 10000000000;
+    totalRisk = 10000000000;
+    leftLength = 0;
+    d = 0;
+    parent = 0;
+}
+                      
+POINT::POINT(void)
+{
+    x = 0;
+    y = 0;
+    riskFromStart = 10000000000;
+    totalRisk = 10000000000;
+    leftLength = 0;
+    d = 0;
+    parent = 0;
+}
+                      
+//============My Algorithm============
+void myAlgorithm(RISK* riskPoint, int m, int n, POINT* start, POINT* end, double dBar, int w, double** risks)
+{
+    clock_t t;
+    t = clock();
+    POINT*** points = new POINT**[n];
+    for(int i = 0; i < n ; i ++)
+    {
+        points[i] = new POINT*[n];
+        for(int j = 0 ; j < n ; j ++)
+        {
+            points[i][j] = new POINT(i, j);
+        }
+    }
+    points[start->x][start->y] = start;
+    points[end->x][end->y] = end;
+                      
+    vector<POINT*> open;
+    bool** close = new bool*[n];
+    for(int i = 0; i < n ; i ++)
+    {
+        close[i] = new bool[n];
+    }
+                      
+    start->riskFromStart = 0;
+    start->leftLength = 0;
+    start->totalRisk = w + calRisk(riskPoint, m, start, end, risks);
+    start->d = 0;
+    start->parent = start;
+                      
+    start = start->parent;
+                      
+    open.push_back(start); push_heap(open.begin(), open.end(), minHeap());
+                      
+    POINT* s;
+    while (open.size() != 0)
+    {
+        pop_heap(open.begin(), open.end(), minHeap()); s = open.back(); open.pop_back();
+        //============select point============
+        if (s == end)
+        {
+            //============found============
+            pop_heap(open.begin(), open.end(), minHeap()); s = open.back(); open.pop_back();
+            if(s->totalRisk <= end->totalRisk)
+            {
+                open.push_back(end); push_heap(open.begin(), open.end(), minHeap());
+            }
+            else
+            {
+                return;
+            }
+        }
+        close[s->x][s->y] = true;
+        for(int i = 0 ; i < n ; i++)
+        {
+            for(int j = 0; j < n ; j ++)
+            {
+                if (!close[i][j])
+                {
+                    POINT* sPrime = points[i][j];
+      
+                    double lSSPrime = calDist(s->x, s->y, sPrime->x, sPrime->y);
+                    double l = s->d + lSSPrime;
+                    if (l + calDist(sPrime->x, sPrime->y, end->x, end->y) <= dBar)
+                    {
+                        double sSPrimeRisk = s->riskFromStart + calRisk(riskPoint, m, s, sPrime, risks) + w;
+                        if (sSPrimeRisk <= sPrime->riskFromStart)
+                        {
+                            sPrime->parent = s;
+                            sPrime->riskFromStart = sSPrimeRisk;
+                            sPrime->d = l;
+                            //============parent change============
+                        }
+                    }
+                          
+                    sPrime->leftLength = 1 - (sPrime->d - int(sPrime->d));
+                    if(sPrime->leftLength == 1)
+                        sPrime->leftLength = 0;
+                    if(sPrime != end)
+                    {
+                        sPrime->totalRisk = sPrime->riskFromStart + calRisk(riskPoint, m, sPrime, end, risks) + w;
+                    }
+                    else
+                        sPrime->totalRisk = sPrime->riskFromStart;
+                          
+                    //============check============
+                    vector<POINT*>::iterator openIter = find(open.begin(), open.end(), sPrime);
+                    if (openIter != open.end())
+                    {
+                        //============point not in open============
+                        open.erase(openIter);
+                    }
+                    open.push_back(sPrime); push_heap(open.begin(), open.end(), minHeap());
+                }
+            }
+        }
+    }
+}
+                      
+//============Given LeftLength, Cal Risk Between Two Point============
+double calRisk(RISK* riskPoint, int m, POINT* start, POINT* end, double** risks)
+{
+    double leftLength = start->leftLength;
+    double length = calDist(start->x, start->y, end->x, end->y);
+    double doubleCalPointsX,doubleCalPointsY;
+    int calPointsX, calPointsY;
+    //計算兩點之間長度
+    //計算xy步長
+    double xLen = (end->x - start->x) / length, yLen = (end->y - start->y) / length;
+    double riskStepX = riskStep * xLen, riskStepY = riskStep * yLen;
+    double totalRisk = 0, d, tempRisk;
+    //每步計算風險值
+    doubleCalPointsX = riskStep * (xLen * (leftLength - 1) + start->x) + 0.5;
+    doubleCalPointsY = riskStep * (yLen * (leftLength - 1) + start->y) + 0.5;
+    for (double i = leftLength; i < length; i += 1)
+    {
+        doubleCalPointsX += riskStepX;
+        doubleCalPointsY += riskStepY;
+        calPointsX = int(doubleCalPointsX);
+        calPointsY = int(doubleCalPointsY);
+        //每步計算每個風險點的風險值
+        if(risks[calPointsX][calPointsY] < 0)
+        {
+            tempRisk = 0;
+            double calPointsXriskStep = calPointsX/riskStep;
+            double calPointsYriskStep = calPointsY/riskStep;
+            for (int p = 0; p < m; p++)
+            {
+                if(abs((riskPoint + p)->x - calPointsXriskStep) <= (riskPoint + p)->R && abs((riskPoint + p)->y - calPointsYriskStep) <= (riskPoint + p)->R)
+                {
+                    d = calDist((riskPoint + p)->x, (riskPoint + p)->y, calPointsXriskStep, calPointsYriskStep);
+                    tempRisk += (riskPoint + p)->P * max((riskPoint + p)->R - d, 0.0) / (riskPoint + p)->R;
+                }
+            }
+            risks[calPointsX][calPointsY] = tempRisk;
+        }
+        totalRisk += risks[calPointsX][calPointsY];
+    }
+    return totalRisk;
+}
+                      
+//============Cal Distance Between Two Point============
+inline double calDist(double startX, double startY, double endX, double endY)
+{
+    return sqrt(pow(endX - startX, 2) + pow(endY - startY, 2));
+}
